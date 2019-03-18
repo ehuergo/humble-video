@@ -11,6 +11,8 @@
 #ifndef VP9_ENCODER_VP9_BLOCK_H_
 #define VP9_ENCODER_VP9_BLOCK_H_
 
+#include "vpx_util/vpx_thread.h"
+
 #include "vp9/common/vp9_entropymv.h"
 #include "vp9/common/vp9_entropy.h"
 
@@ -40,8 +42,6 @@ struct macroblock_plane {
   int16_t *round;
 
   int64_t quant_thred[2];
-  // Zbin Over Quant value
-  int16_t zbin_extra;
 };
 
 /* The [2] dimension is for whether we skip the EOB node (i.e. if previous
@@ -49,23 +49,55 @@ struct macroblock_plane {
 typedef unsigned int vp9_coeff_cost[PLANE_TYPES][REF_TYPES][COEF_BANDS][2]
                                    [COEFF_CONTEXTS][ENTROPY_TOKENS];
 
+typedef struct {
+  int_mv ref_mvs[MAX_REF_FRAMES][MAX_MV_REF_CANDIDATES];
+  uint8_t mode_context[MAX_REF_FRAMES];
+} MB_MODE_INFO_EXT;
+
+typedef struct {
+  int col_min;
+  int col_max;
+  int row_min;
+  int row_max;
+} MvLimits;
+
 typedef struct macroblock MACROBLOCK;
 struct macroblock {
+// cf. https://bugs.chromium.org/p/webm/issues/detail?id=1054
+#if defined(_MSC_VER) && _MSC_VER < 1900
+  int64_t bsse[MAX_MB_PLANE << 2];
+#endif
+
   struct macroblock_plane plane[MAX_MB_PLANE];
 
   MACROBLOCKD e_mbd;
+  MB_MODE_INFO_EXT *mbmi_ext;
+  MB_MODE_INFO_EXT *mbmi_ext_base;
   int skip_block;
   int select_tx_size;
   int skip_recode;
   int skip_optimize;
   int q_index;
+  int block_qcoeff_opt;
+  int block_tx_domain;
 
+  // The equivalent error at the current rdmult of one whole bit (not one
+  // bitcost unit).
   int errorperbit;
+  // The equivalend SAD error of one (whole) bit at the current quantizer
+  // for large blocks.
   int sadperbit16;
+  // The equivalend SAD error of one (whole) bit at the current quantizer
+  // for sub-8x8 blocks.
   int sadperbit4;
   int rddiv;
   int rdmult;
   int mb_energy;
+
+  // These are set to their default values at the beginning, and then adjusted
+  // further in the encoding process.
+  BLOCK_SIZE min_partition_size;
+  BLOCK_SIZE max_partition_size;
 
   int mv_best_ref_index[MAX_REF_FRAMES];
   unsigned int max_mv_context[MAX_REF_FRAMES];
@@ -85,12 +117,15 @@ struct macroblock {
 
   // These define limits to motion vector components to prevent them
   // from extending outside the UMV borders
-  int mv_col_min;
-  int mv_col_max;
-  int mv_row_min;
-  int mv_row_max;
+  MvLimits mv_limits;
 
+  // Notes transform blocks where no coefficents are coded.
+  // Set during mode selection. Read during block encoding.
   uint8_t zcoeff_blk[TX_SIZES][256];
+
+  // Accumulate the tx block eobs in a partition block.
+  int32_t sum_y_eobs[TX_SIZES];
+
   int skip;
 
   int encode_breakout;
@@ -98,30 +133,71 @@ struct macroblock {
   // note that token_costs is the cost when eob node is skipped
   vp9_coeff_cost token_costs[TX_SIZES];
 
-  int in_static_area;
-
   int optimize;
 
   // indicate if it is in the rd search loop or encoding process
   int use_lp32x32fdct;
   int skip_encode;
 
+  // In first pass, intra prediction is done based on source pixels
+  // at tile boundaries
+  int fp_src_pred;
+
   // use fast quantization process
   int quant_fp;
 
   // skip forward transform and quantization
   uint8_t skip_txfm[MAX_MB_PLANE << 2];
+#define SKIP_TXFM_NONE 0
+#define SKIP_TXFM_AC_DC 1
+#define SKIP_TXFM_AC_ONLY 2
 
+// cf. https://bugs.chromium.org/p/webm/issues/detail?id=1054
+#if !defined(_MSC_VER) || _MSC_VER >= 1900
   int64_t bsse[MAX_MB_PLANE << 2];
+#endif
 
   // Used to store sub partition's choices.
   MV pred_mv[MAX_REF_FRAMES];
 
-  void (*fwd_txm4x4)(const int16_t *input, tran_low_t *output, int stride);
-  void (*itxm_add)(const tran_low_t *input, uint8_t *dest, int stride, int eob);
+  // Strong color activity detection. Used in RTC coding mode to enhance
+  // the visual quality at the boundary of moving color objects.
+  uint8_t color_sensitivity[2];
+
+  uint8_t sb_is_skin;
+
+  uint8_t skip_low_source_sad;
+
+  uint8_t lowvar_highsumdiff;
+
+  uint8_t last_sb_high_content;
+
+  int sb_use_mv_part;
+
+  int sb_mvcol_part;
+
+  int sb_mvrow_part;
+
+  int sb_pickmode_part;
+
+  // For each superblock: saves the content value (e.g., low/high sad/sumdiff)
+  // based on source sad, prior to encoding the frame.
+  uint8_t content_state_sb;
+
+  // Used to save the status of whether a block has a low variance in
+  // choose_partitioning. 0 for 64x64, 1~2 for 64x32, 3~4 for 32x64, 5~8 for
+  // 32x32, 9~24 for 16x16.
+  uint8_t variance_low[25];
+
+  uint8_t arf_frame_usage;
+  uint8_t lastgolden_frame_usage;
+
+  void (*fwd_txfm4x4)(const int16_t *input, tran_low_t *output, int stride);
+  void (*inv_txfm_add)(const tran_low_t *input, uint8_t *dest, int stride,
+                       int eob);
 #if CONFIG_VP9_HIGHBITDEPTH
-  void (*highbd_itxm_add)(const tran_low_t *input, uint8_t *dest, int stride,
-                          int eob, int bd);
+  void (*highbd_inv_txfm_add)(const tran_low_t *input, uint16_t *dest,
+                              int stride, int eob, int bd);
 #endif
 };
 

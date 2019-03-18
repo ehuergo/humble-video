@@ -98,7 +98,7 @@ static uint32_t softfloat_mul(uint32_t x, uint64_t mantissa)
 
 static uint8_t lag_calc_zero_run(int8_t x)
 {
-    return (x << 1) ^ (x >> 7);
+    return (x * 2) ^ (x >> 7);
 }
 
 static int lag_decode_prob(GetBitContext *gb, uint32_t *value)
@@ -128,7 +128,7 @@ static int lag_decode_prob(GetBitContext *gb, uint32_t *value)
     }
 
     val  = get_bits_long(gb, bits);
-    val |= 1 << bits;
+    val |= 1U << bits;
 
     *value = val - 1;
 
@@ -191,7 +191,9 @@ static int lag_read_prob_header(lag_rac *rac, GetBitContext *gb)
         }
 
         scale_factor++;
-        cumulative_target = 1 << scale_factor;
+        if (scale_factor >= 32U)
+            return AVERROR_INVALIDDATA;
+        cumulative_target = 1U << scale_factor;
 
         if (scaled_cumul_prob > cumulative_target) {
             av_log(rac->avctx, AV_LOG_ERROR,
@@ -675,10 +677,10 @@ static int lag_decode_frame(AVCodecContext *avctx,
         lag_decode_arith_plane(l, p->data[0], avctx->width, avctx->height,
                                p->linesize[0], buf + offset_ry,
                                buf_size - offset_ry);
-        lag_decode_arith_plane(l, p->data[1], avctx->width / 2,
+        lag_decode_arith_plane(l, p->data[1], (avctx->width + 1) / 2,
                                avctx->height, p->linesize[1],
                                buf + offset_gu, buf_size - offset_gu);
-        lag_decode_arith_plane(l, p->data[2], avctx->width / 2,
+        lag_decode_arith_plane(l, p->data[2], (avctx->width + 1) / 2,
                                avctx->height, p->linesize[2],
                                buf + offset_bv, buf_size - offset_bv);
         break;
@@ -702,11 +704,11 @@ static int lag_decode_frame(AVCodecContext *avctx,
         lag_decode_arith_plane(l, p->data[0], avctx->width, avctx->height,
                                p->linesize[0], buf + offset_ry,
                                buf_size - offset_ry);
-        lag_decode_arith_plane(l, p->data[2], avctx->width / 2,
-                               avctx->height / 2, p->linesize[2],
+        lag_decode_arith_plane(l, p->data[2], (avctx->width + 1) / 2,
+                               (avctx->height + 1) / 2, p->linesize[2],
                                buf + offset_gu, buf_size - offset_gu);
-        lag_decode_arith_plane(l, p->data[1], avctx->width / 2,
-                               avctx->height / 2, p->linesize[1],
+        lag_decode_arith_plane(l, p->data[1], (avctx->width + 1) / 2,
+                               (avctx->height + 1) / 2, p->linesize[1],
                                buf + offset_bv, buf_size - offset_bv);
         break;
     default:
@@ -748,5 +750,5 @@ AVCodec ff_lagarith_decoder = {
     .init           = lag_decode_init,
     .close          = lag_decode_end,
     .decode         = lag_decode_frame,
-    .capabilities   = CODEC_CAP_DR1 | CODEC_CAP_FRAME_THREADS,
+    .capabilities   = AV_CODEC_CAP_DR1 | AV_CODEC_CAP_FRAME_THREADS,
 };

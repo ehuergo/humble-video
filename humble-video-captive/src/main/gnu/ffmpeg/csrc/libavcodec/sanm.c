@@ -457,15 +457,16 @@ static void destroy_buffers(SANMVideoContext *ctx)
     ctx->frm0_size =
     ctx->frm1_size =
     ctx->frm2_size = 0;
+    init_sizes(ctx, 0, 0);
 }
 
 static av_cold int init_buffers(SANMVideoContext *ctx)
 {
-    av_fast_padded_malloc(&ctx->frm0, &ctx->frm0_size, ctx->buf_size);
-    av_fast_padded_malloc(&ctx->frm1, &ctx->frm1_size, ctx->buf_size);
-    av_fast_padded_malloc(&ctx->frm2, &ctx->frm2_size, ctx->buf_size);
+    av_fast_padded_mallocz(&ctx->frm0, &ctx->frm0_size, ctx->buf_size);
+    av_fast_padded_mallocz(&ctx->frm1, &ctx->frm1_size, ctx->buf_size);
+    av_fast_padded_mallocz(&ctx->frm2, &ctx->frm2_size, ctx->buf_size);
     if (!ctx->version)
-        av_fast_padded_malloc(&ctx->stored_frame,
+        av_fast_padded_mallocz(&ctx->stored_frame,
                               &ctx->stored_frame_size, ctx->buf_size);
 
     if (!ctx->frm0 || !ctx->frm1 || !ctx->frm2 ||
@@ -1524,5 +1525,5 @@ AVCodec ff_sanm_decoder = {
     .init           = decode_init,
     .close          = decode_end,
     .decode         = decode_frame,
-    .capabilities   = CODEC_CAP_DR1,
+    .capabilities   = AV_CODEC_CAP_DR1,
 };

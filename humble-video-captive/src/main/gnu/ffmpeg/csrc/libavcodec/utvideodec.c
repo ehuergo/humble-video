@@ -28,6 +28,7 @@
 #include <stdlib.h>
 
 #include "libavutil/intreadwrite.h"
+#include "libavutil/pixdesc.h"
 #include "avcodec.h"
 #include "bswapdsp.h"
 #include "bytestream.h"
@@ -56,12 +57,13 @@ static int build_huff(const uint8_t *src, VLC *vlc, int *fsym)
         *fsym = he[0].sym;
         return 0;
     }
-    if (he[0].len > 32)
-        return -1;
 
     last = 255;
     while (he[last].len == 255 && last)
         last--;
+
+    if (he[last].len > 32)
+        return -1;
 
     code = 1;
     for (i = last; i >= 0; i--) {
@@ -142,7 +144,7 @@ static int decode_plane(UtvideoContext *c, int plane_no,
 
         memcpy(c->slice_bits, src + slice_data_start + c->slices * 4,
                slice_size);
-        memset(c->slice_bits + slice_size, 0, FF_INPUT_BUFFER_PADDING_SIZE);
+        memset(c->slice_bits + slice_size, 0, AV_INPUT_BUFFER_PADDING_SIZE);
         c->bdsp.bswap_buf((uint32_t *) c->slice_bits,
                           (uint32_t *) c->slice_bits,
                           (slice_data_end - slice_data_start + 3) >> 2);
@@ -214,6 +216,8 @@ static void restore_median(uint8_t *src, int step, int stride,
         slice_height = ((((slice + 1) * height) / slices) & cmask) -
                        slice_start;
 
+        if (!slice_height)
+            continue;
         bsrc = src + slice_start * stride;
 
         // first line - left neighbour prediction
@@ -224,7 +228,7 @@ static void restore_median(uint8_t *src, int step, int stride,
             A        = bsrc[i];
         }
         bsrc += stride;
-        if (slice_height == 1)
+        if (slice_height <= 1)
             continue;
         // second line - first element has top prediction, the rest uses median
         C        = bsrc[-stride];
@@ -269,6 +273,8 @@ static void restore_median_il(uint8_t *src, int step, int stride,
         slice_height   = ((((slice + 1) * height) / slices) & cmask) -
                          slice_start;
         slice_height >>= 1;
+        if (!slice_height)
+            continue;
 
         bsrc = src + slice_start * stride;
 
@@ -284,7 +290,7 @@ static void restore_median_il(uint8_t *src, int step, int stride,
             A                 = bsrc[stride + i];
         }
         bsrc += stride2;
-        if (slice_height == 1)
+        if (slice_height <= 1)
             continue;
         // second line - first element has top prediction, the rest uses median
         C        = bsrc[-stride2];
@@ -380,7 +386,7 @@ static int decode_frame(AVCodecContext *avctx, void *data, int *got_frame,
     }
 
     av_fast_malloc(&c->slice_bits, &c->slice_bits_size,
-                   max_slice_size + FF_INPUT_BUFFER_PADDING_SIZE);
+                   max_slice_size + AV_INPUT_BUFFER_PADDING_SIZE);
 
     if (!c->slice_bits) {
         av_log(avctx, AV_LOG_ERROR, "Cannot allocate temporary buffer\n");
@@ -469,6 +475,7 @@ static int decode_frame(AVCodecContext *avctx, void *data, int *got_frame,
 static av_cold int decode_init(AVCodecContext *avctx)
 {
     UtvideoContext * const c = avctx->priv_data;
+    int h_shift, v_shift;
 
     c->avctx = avctx;
 
@@ -533,6 +540,13 @@ static av_cold int decode_init(AVCodecContext *avctx)
         return AVERROR_INVALIDDATA;
     }
 
+    av_pix_fmt_get_chroma_sub_sample(avctx->pix_fmt, &h_shift, &v_shift);
+    if ((avctx->width  & ((1<<h_shift)-1)) ||
+        (avctx->height & ((1<<v_shift)-1))) {
+        avpriv_request_sample(avctx, "Odd dimensions");
+        return AVERROR_PATCHWELCOME;
+    }
+
     return 0;
 }
 
@@ -554,5 +568,5 @@ AVCodec ff_utvideo_decoder = {
     .init           = decode_init,
     .close          = decode_end,
     .decode         = decode_frame,
-    .capabilities   = CODEC_CAP_DR1 | CODEC_CAP_FRAME_THREADS,
+    .capabilities   = AV_CODEC_CAP_DR1 | AV_CODEC_CAP_FRAME_THREADS,
 };

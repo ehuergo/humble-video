@@ -2,13 +2,13 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>io.humble</groupId>
   <artifactId>humble-video-parent</artifactId>
-  <version>0.2.1</version>
+  <version>0.3.0</version>
   <packaging>pom</packaging>
   <name>humble-video-parent</name>
   <url>http://www.humble.io</url>
 
   <properties>
-    <humble.version>0.2.1</humble.version>
+    <humble.version>0.3.0</humble.version>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <maven.build.timestamp.format>yyyy-MM-dd HH:mm:ss</maven.build.timestamp.format>
     <humble.build.timestamp>${maven.build.timestamp}</humble.build.timestamp>
@@ -313,12 +313,7 @@
       </dependency>
       <dependency>
         <groupId>io.humble</groupId>
-        <artifactId>humble-video-arch-i686-apple-darwin12</artifactId>
-        <version>${humble.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>io.humble</groupId>
-        <artifactId>humble-video-arch-x86_64-apple-darwin12</artifactId>
+        <artifactId>humble-video-arch-x86_64-apple-darwin18</artifactId>
         <version>${humble.version}</version>
       </dependency>
       <dependency>
@@ -343,12 +338,7 @@
       </dependency>
       <dependency>
         <groupId>io.humble</groupId>
-        <artifactId>humble-video-arch-i686-apple-darwin12-debug</artifactId>
-        <version>${humble.version}</version>
-      </dependency>
-      <dependency>
-        <groupId>io.humble</groupId>
-        <artifactId>humble-video-arch-x86_64-apple-darwin12-debug</artifactId>
+        <artifactId>humble-video-arch-x86_64-apple-darwin18-debug</artifactId>
         <version>${humble.version}</version>
       </dependency>
       <dependency>

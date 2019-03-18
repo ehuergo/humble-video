@@ -64,12 +64,12 @@ static void scale_coefs (
     int dynrng,
     int len)
 {
-    int i, shift, round;
-    int16_t mul;
+    int i, shift;
+    unsigned mul, round;
     int temp, temp1, temp2, temp3, temp4, temp5, temp6, temp7;
 
     mul = (dynrng & 0x1f) + 0x20;
-    shift = 4 - ((dynrng << 23) >> 28);
+    shift = 4 - (sign_extend(dynrng, 9) >> 5);
     if (shift > 0 ) {
       round = 1 << (shift-1);
       for (i=0; i<len; i+=8) {
@@ -164,6 +164,7 @@ static void ac3_downmix_c_fixed16(int16_t **samples, int16_t (*matrix)[2],
     }
 }
 
+#include "eac3dec.c"
 #include "ac3dec.c"
 
 static const AVOption options[] = {
@@ -187,7 +188,7 @@ AVCodec ff_ac3_fixed_decoder = {
     .init           = ac3_decode_init,
     .close          = ac3_decode_end,
     .decode         = ac3_decode_frame,
-    .capabilities   = CODEC_CAP_DR1,
+    .capabilities   = AV_CODEC_CAP_DR1,
     .long_name      = NULL_IF_CONFIG_SMALL("ATSC A/52A (AC-3)"),
     .sample_fmts    = (const enum AVSampleFormat[]) { AV_SAMPLE_FMT_S16P,
                                                       AV_SAMPLE_FMT_NONE },

@@ -5,7 +5,7 @@
 # ALSO CHANGE ANY CORRESPONDING VERSION NUMBERS IN THE
 # JAVA build.xml FILE
 m4_define([VSM4_LIB_MAJOR_VERSION], [0])
-m4_define([VSM4_LIB_MINOR_VERSION], [2])
+m4_define([VSM4_LIB_MINOR_VERSION], [3])
 m4_define([VSM4_LIB_PATCH_VERSION], [0])
 
 AC_INIT([humble-captive],[VSM4_LIB_MAJOR_VERSION.VSM4_LIB_MINOR_VERSION.VSM4_LIB_PATCH_VERSION],[info@humble.io])
@@ -158,6 +158,11 @@ AC_PATH_PROG([YASM],[yasm])
 AC_ARG_VAR(YASM,
           [Location of the 'yasm' program; if found, we will build with some cool assembly on x86/x86_64 systems.])
 AM_CONDITIONAL(HAVE_YASM, [ test "x$YASM" != "x" ])
+
+AC_PATH_PROG([NASM],[nasm])
+AC_ARG_VAR(NASM,
+          [Location of the 'nasm' program; if found, we will build with some cool assembly on x86/x86_64 systems.])
+AM_CONDITIONAL(HAVE_NASM, [ test "x$NASM" != "x" ])
 
 AM_CONDITIONAL(VS_CAPTIVE_ZLIB, [ test "${HOST_TYPE}" != "Mac" ])
 
